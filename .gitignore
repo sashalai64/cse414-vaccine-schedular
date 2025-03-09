@@ -1,0 +1,25 @@
+# Byte-compiled / cached files
+__pycache__/
+*.py[cod]
+
+# Virtual environment
+venv/
+env/
+*.egg-info/
+
+# Logs
+*.log
+
+# IDE settings
+.vscode/
+.idea/
+
+# Packaging artifacts
+*.tar.gz
+*.zip
+*.whl
+dist/
+build/
+
+# OS generated files 
+.DS_Store
