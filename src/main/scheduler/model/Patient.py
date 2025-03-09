@@ -70,24 +70,31 @@ class Patient:
         conn = cm.create_connection()
         cursor = conn.cursor()
         
-        get_appointments = """
-            SELECT R.Id, R.Time, R.Cusername, R.Vname 
-            FROM Reservations R 
-            WHERE R.Pusername = ? 
-            ORDER BY R.Time
-        """
+        get_appointments = "\
+                            SELECT\
+                                R.Id,\
+                                R.Vname,\
+                                R.Time,\
+                                R.Cusername\
+                            FROM\
+                                Reservations AS R\
+                            WHERE\
+                                R.Pusername = ?\
+                            Order By\
+                                R.Time\
+                            "
 
         appointments = []
         try:
             cursor.execute(get_appointments, (self.username,))
             for row in cursor:
                 appointment = {
-                'id': row['Id'],
-                'date': row['Time'],
-                'caregiver': row['Cusername'],
-                'vaccine': row['Vname']
-            }
-            appointments.append(appointment)
+                    'id': row['Id'],
+                    'date': row['Time'],
+                    'caregiver': row['Cusername'],
+                    'vaccine': row['Vname']
+                }
+                appointments.append(appointment)
 
         except sqlite3.Error:
             raise

@@ -32,10 +32,10 @@ class Reservation:
         conn = cm.create_connection()
         cursor = conn.cursor()
         
-        add_reservation = """
-            INSERT INTO Reservations (Time, Cusername, Pusername, Vname) 
-            VALUES (?, ?, ?, ?)
-        """
+        add_reservation = "\
+            INSERT INTO Reservations (Time, Cusername, Pusername, Vname)\
+            VALUES (?, ?, ?, ?)\
+        "
         try:
             cursor.execute(add_reservation, (self.time, self.cusername, self.pusername, self.vname))
             conn.commit()
