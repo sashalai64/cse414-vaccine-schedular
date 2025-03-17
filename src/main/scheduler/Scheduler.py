@@ -1,6 +1,7 @@
 from model.Vaccine import Vaccine
 from model.Caregiver import Caregiver
 from model.Patient import Patient
+from model.Reservation import Reservation
 from util.Util import Util
 from db.ConnectionManager import ConnectionManager
 import sqlite3
@@ -198,17 +199,195 @@ def login_caregiver(tokens):
 
 
 def search_caregiver_schedule(tokens):
-    """
-    TODO: Part 2
-    """
-    pass
+    # search_caregiver_schedule <date>
+    # check 1: check if user is logged in
+    if current_caregiver is None and current_patient is None:
+        print("Please login first")
+        return
+    
+    # check 2: check the length for tokens need to be exactly 2 to include all information (with the operation name)
+    if len(tokens) != 2:
+        print("Please try again")
+        return
+
+    date = tokens[1]
+    
+    try:
+        date_tokens = date.split("-")
+        year = int(date_tokens[0])
+        month = int(date_tokens[1])
+        day = int(date_tokens[2])
+        # Format with time component to match database format
+        d = f"{year}-{month:02d}-{day:02d} 00:00:00"
+    
+        cm = ConnectionManager()
+        conn = cm.create_connection()
+        cursor = conn.cursor()
+
+        available_caregiver_query = """
+            SELECT A.Username
+            FROM Availabilities AS A
+            WHERE A.Time = ? 
+            AND A.Username NOT IN (
+                SELECT R.Cusername
+                FROM Reservations AS R
+                WHERE R.Time = ?
+            )
+            ORDER BY A.Username
+        """
+        cursor.execute(available_caregiver_query, (d, d))
+        available_caregivers = cursor.fetchall()
+
+        print('Caregivers:')
+        if not available_caregivers:
+            print("No caregivers available")
+        else:
+            for row in available_caregivers:
+                print(row["Username"])
+
+        get_vaccines = "SELECT * FROM Vaccines"
+        cursor.execute(get_vaccines)
+        vaccines = cursor.fetchall()
+
+        print('Vaccines:')
+        if not vaccines:
+            print("No vaccines available")
+        else:
+            for row in vaccines:
+                print(f"{row['Name']} {row['Doses']}")
+
+        cm.close_connection()
+
+        #return available_caregivers
+
+    except sqlite3.Error as e:
+        print("Please try again")
+        return
+    except ValueError:
+        print("Please try again")
+        return
+    except Exception as e:
+        print("Please try again")
+        return
+
 
 
 def reserve(tokens):
-    """
-    TODO: Part 2
-    """
-    pass
+    # reserve <date> <vaccine>
+    # check 1: check if the current logged-in user is a patient
+    if current_caregiver:
+        print("Please login as a patient")
+        return
+    if current_patient is None:
+        print("Please login first")
+        return
+    
+    # check 2: the length for tokens need to be exactly 3
+    if len(tokens) != 3:
+        print("Please try again")
+        return
+
+    date = tokens[1]
+    vaccine_name = tokens[2]
+    
+    date_tokens = date.split("-")
+
+    try:
+        # Make sure we have the right format
+        if len(date_tokens) != 3:
+            print("Please try again")
+            return
+            
+        year = int(date_tokens[0])
+        month = int(date_tokens[1])
+        day = int(date_tokens[2])
+        d = f"{year}-{month:02d}-{day:02d} 00:00:00"
+        
+        cm = ConnectionManager()
+        conn = cm.create_connection()
+        cursor = conn.cursor()
+
+        # First check if the exact date format exists in Availabilities
+        cursor.execute("SELECT * FROM Availabilities WHERE Time = ?", (d,))
+        existing_avails = cursor.fetchall()
+        
+        # Check if there's any available caregiver
+        available_caregiver_query = """
+            SELECT A.Username
+            FROM Availabilities AS A
+            WHERE A.Time = ?
+            AND A.Username NOT IN (
+                SELECT R.Cusername
+                FROM Reservations AS R
+                WHERE R.Time = ?
+            )
+            ORDER BY A.Username
+            LIMIT 1
+        """
+        cursor.execute(available_caregiver_query, (d, d))
+        caregiver_row = cursor.fetchone()
+        
+        if caregiver_row is None:
+            print("No caregiver is available")
+            cm.close_connection()
+            return
+        
+        caregiver_username = caregiver_row['Username']
+        
+        # Check if the vaccine exists and has available doses
+        vaccine = None
+        try:
+            vaccine = Vaccine(vaccine_name, 0).get()
+            if vaccine is None:
+                print("Please try again")
+                cm.close_connection()
+                return
+                
+            if vaccine.get_available_doses() <= 0:
+                print("Not enough available doses")
+                cm.close_connection()
+                return
+                
+        except sqlite3.Error as e:
+            print("Please try again")
+            cm.close_connection()
+            return
+        except Exception as e:
+            print("Please try again")
+            cm.close_connection()
+            return
+        
+        patient_username = current_patient.get_username()
+
+        # If we get here, we have an available caregiver and vaccine doses
+        # Make the reservation
+        try:
+            reservation = Reservation(time=d, cusername=caregiver_username, pusername=patient_username, vname=vaccine_name)
+            reservation.save_to_db()
+
+            # Decrease vaccine doses by 1
+            vaccine.decrease_available_doses(1)
+
+            print(f"Appointment ID {reservation.get_id()}, Caregiver username {caregiver_username}")
+
+        except sqlite3.Error as e:
+            print("Please try again")
+            cm.close_connection()
+            return
+        except Exception as e:
+            print("Please try again")
+            cm.close_connection()
+            return
+                
+        cm.close_connection()
+    
+    except ValueError:
+        print("Please try again")
+        return
+    except Exception as e:
+        print("Please try again")
+        return
+
 
 
 def upload_availability(tokens):
@@ -260,7 +439,7 @@ def add_doses(tokens):
         print("Please login as a caregiver first!")
         return
 
-    #  check 2: the length for tokens need to be exactly 3 to include all information (with the operation name)
+    #  check 2: the length for tokens need to be exactly 3
     if len(tokens) != 3:
         print("Please try again!")
         return
@@ -303,17 +482,86 @@ def add_doses(tokens):
 
 
 def show_appointments(tokens):
-    '''
-    TODO: Part 2
-    '''
-    pass
+    # show_appointments
+    # check if user is logged in
+    if current_caregiver is None and current_patient is None:
+        print("Please login first")
+        return
+    
+    # check if tokens is 1
+    if len(tokens) != 1:
+        print("Please try again")
+        return
+
+    cm = ConnectionManager()
+    conn = cm.create_connection()
+    cursor = conn.cursor()
+
+    try:
+        # for caregivers
+        if current_caregiver:
+            get_caregiver_appointments = """
+                SELECT R.Id, R.Vname, R.Time, R.Pusername
+                FROM Reservations AS R
+                WHERE R.Cusername = ?
+                ORDER BY R.Id
+            """
+            cursor.execute(get_caregiver_appointments, (current_caregiver.get_username(),))
+            caregiver_appointments = cursor.fetchall()
+
+            if not caregiver_appointments:
+                print("No appointments scheduled")
+                return
+            
+            for row in caregiver_appointments:
+                id, vname, time, cusername = row
+                formatted_date = time[:10]
+                print(f"{id} {vname} {formatted_date} {cusername}")
+
+        # for patients
+        elif current_patient:
+            get_patient_appointments = """
+                SELECT R.Id, R.Vname, R.Time, R.Cusername 
+                FROM Reservations R 
+                WHERE R.Pusername = ? 
+                ORDER BY R.Id
+            """
+            cursor.execute(get_patient_appointments, (current_patient.get_username(),))
+            patient_appointments = cursor.fetchall()
+
+            if not patient_appointments:
+                print("No appointments scheduled")
+                return
+            
+            # Fixed variable name - was using caregiver_appointments instead of patient_appointments
+            
+            for row in patient_appointments:
+                id, vname, time, cusername = row
+                formatted_date = time[:10]
+                print(f"{id} {vname} {formatted_date} {cusername}")
+
+    except sqlite3.Error as e:
+        print("Please try again db")
+        return
+    except Exception as e:
+        print("Please try again e")
+        return 
+    finally:
+        cm.close_connection()
 
 
 def logout(tokens):
-    """
-    TODO: Part 2
-    """
-    pass
+    global current_caregiver, current_patient
+
+    if current_caregiver is None and current_patient is None:
+        print("Please login first")
+        return
+    try: 
+        current_caregiver = current_patient = None
+        print("Successfully logged out")
+    except Exception as e:
+        print("Please try again")
+        return
 
 
 def start():

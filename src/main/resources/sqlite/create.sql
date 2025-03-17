@@ -30,5 +30,4 @@ CREATE TABLE Reservations (
     Cusername varchar(255),
     Pusername varchar(255) REFERENCES Patients (Username),
     Vname varchar(255) REFERENCES Vaccines (Name),
-    CONSTRAINT cargivermatch FOREIGN KEY (Time, Cusername) REFERENCES Availabilities (Time, Username)
 );
