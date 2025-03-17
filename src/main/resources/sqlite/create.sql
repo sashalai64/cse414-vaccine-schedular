@@ -29,5 +29,5 @@ CREATE TABLE Reservations (
     Time date,
     Cusername varchar(255),
     Pusername varchar(255) REFERENCES Patients (Username),
-    Vname varchar(255) REFERENCES Vaccines (Name),
+    Vname varchar(255) REFERENCES Vaccines (Name)
 );

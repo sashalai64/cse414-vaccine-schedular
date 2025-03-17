@@ -5,6 +5,7 @@ from model.Reservation import Reservation
 from util.Util import Util
 from db.ConnectionManager import ConnectionManager
 import sqlite3
+import os
 import datetime
 
 
@@ -160,7 +161,7 @@ def login_patient(tokens):
     if patient is None:
         print("Login patient failed")
     else:
-        print("Logged in as: " + username)
+        print("Logged in as " + username)
         current_patient = patient
 
 
@@ -214,9 +215,23 @@ def search_caregiver_schedule(tokens):
     
     try:
         date_tokens = date.split("-")
+        if len(date_tokens) != 3:
+            print("Please try again")
+            return
+            
+        # Check if first token is a 4-digit year
+        if len(date_tokens[0]) != 4:
+            print("Please try again")
+            return
+        
         year = int(date_tokens[0])
         month = int(date_tokens[1])
         day = int(date_tokens[2])
+
+        if month < 1 or month > 12 or day < 1 or day > 31:
+            print("Please try again")
+            return
+        
         # Format with time component to match database format
         d = f"{year}-{month:02d}-{day:02d} 00:00:00"
     
@@ -306,10 +321,6 @@ def reserve(tokens):
         cm = ConnectionManager()
         conn = cm.create_connection()
         cursor = conn.cursor()
-
-        # First check if the exact date format exists in Availabilities
-        cursor.execute("SELECT * FROM Availabilities WHERE Time = ?", (d,))
-        existing_avails = cursor.fetchall()
         
         # Check if there's any available caregiver
         available_caregiver_query = """
@@ -338,12 +349,8 @@ def reserve(tokens):
         vaccine = None
         try:
             vaccine = Vaccine(vaccine_name, 0).get()
-            if vaccine is None:
-                print("Please try again")
-                cm.close_connection()
-                return
                 
-            if vaccine.get_available_doses() <= 0:
+            if vaccine is None or vaccine.get_available_doses() <= 0:
                 print("Not enough available doses")
                 cm.close_connection()
                 return
@@ -553,6 +560,10 @@ def show_appointments(tokens):
 def logout(tokens):
     global current_caregiver, current_patient
 
+    if len(tokens) != 1:
+        print("Please try again")
+        return
+    
     if current_caregiver is None and current_patient is None:
         print("Please login first")
         return
@@ -626,6 +637,27 @@ def start():
 
 
 if __name__ == "__main__":
+    # checks if tables exist in the SQLite database and runs create.sql if they don’t
+    cm = ConnectionManager()
+    conn = cm.create_connection()
+    sql_file_path = os.path.join(os.path.dirname(__file__), "..", "resources", "sqlite", "create.sql")
+    try:
+        cursor = conn.cursor()
+        # Query for tables in the database information schema
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        if not cursor.fetchone():  # No tables exist
+            with open(sql_file_path, 'r') as sql_file:
+                sql_script = sql_file.read()
+            # Run create.sql script against the database
+            cursor.executescript(sql_script)
+            conn.commit()
+    except sqlite3.Error as e:
+        print("Error initializing database tables:", e)
+    except FileNotFoundError:
+        print(f"Error: {sql_file_path} not found.")
+    finally:
+        cm.close_connection()
+
     # start command line
     print()
     print("Welcome to the COVID-19 Vaccine Reservation Scheduling Application!")
