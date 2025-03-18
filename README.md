@@ -14,11 +14,13 @@ The application connects to a local SQLite database, which stores all relevant d
   - Manage vaccine stock
   - Open appointment slots
   - View scheduled appointments
+  - Cancel scheduled appointments
 
 - **Patient Functionality**
   - Search for available caregivers by date
   - Schedule a vaccination appointment with available caregivers
   - View scheduled appointments
+  - Cancel scheduled appointments
 
 
 
